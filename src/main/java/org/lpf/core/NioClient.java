@@ -24,6 +24,7 @@ public class NioClient {
 	private ExecutorService executorService;
 	private ByteBuffer buffer;
 	private static int DEFAULT_BUFFERSIZE = 1024;//默认缓冲区大小为1024字节
+	private SocketChannel channel;
 	
 	public NioClient(String ip,int port){
 		this.ip = ip;
@@ -35,7 +36,7 @@ public class NioClient {
 	public void connect() throws IOException{
 		if(selector == null)  
 		    selector = Selector.open();  
-		SocketChannel channel = SocketChannel.open();  
+		channel = SocketChannel.open();  
 		channel.configureBlocking(false);  
 		channel.connect(new InetSocketAddress(ip, port));  
 		channel.register(selector, SelectionKey.OP_CONNECT);
@@ -63,10 +64,10 @@ public class NioClient {
 	
 	public void handleKey(SelectionKey key) throws IOException{
 		 if (key.isConnectable()){
-			 SocketChannel socketChannel = (SocketChannel) key.channel();
-			 if (socketChannel.isConnectionPending())
-				 socketChannel.finishConnect();
-			 socketChannel.register(selector, SelectionKey.OP_READ);
+			 channel = (SocketChannel) key.channel();
+			 if (channel.isConnectionPending())
+				 channel.finishConnect();
+			 channel.register(selector, SelectionKey.OP_READ);
 		 }
 		 if (key.isReadable()){
 			 receiveData(key);
@@ -74,7 +75,7 @@ public class NioClient {
 	}
 	
 	public void receiveData(SelectionKey key) throws IOException{
-		SocketChannel channel = (SocketChannel) key.channel();
+		channel = (SocketChannel) key.channel();
         int count = channel.read(buffer);
         if (count > 0) 
         {
@@ -95,7 +96,7 @@ public class NioClient {
         buffer.clear();
 	}
 	
-	public static void sendMsg(SocketChannel socket, int code, GeneratedMessage info) throws IOException{
+	public void sendMsg(int code, GeneratedMessage info) throws IOException{
 		 byte[] data = info.toByteArray();
 		 byte[] send_datas = new byte[data.length+8];
 		 byte[] msg_code = BitConverter.intToBytes(code);
@@ -103,7 +104,7 @@ public class NioClient {
 		 System.arraycopy(msg_code, 0, send_datas, 0, 4);
 		 System.arraycopy(length, 0, send_datas, 4, 4);
 		 System.arraycopy(data, 0, send_datas, 8, data.length);
-		 socket.write(ByteBuffer.wrap(send_datas));
+		 channel.write(ByteBuffer.wrap(send_datas));
 		 //System.out.println(socketChannel.socket().getSendBufferSize());
 		 System.out.println("data sent. Message code: "+code);
 	}
